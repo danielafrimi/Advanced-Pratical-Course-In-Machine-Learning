@@ -4,12 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class SimpleModel(nn.Module):
+class Net(nn.Module):
     """
     very simple model, to be trained on cpu, for code testing.
     """
     def __init__(self):
-        super(SimpleModel, self).__init__()
+        super(Net, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=5)

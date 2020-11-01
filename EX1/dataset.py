@@ -31,10 +31,6 @@ def get_dataset_as_array(path='./data/dataset.pickle'):
 # useful for using data-loaders
 def get_dataset_as_torch_dataset(path='./data/dataset.pickle'):
     dataset_as_array = get_dataset_as_array(path)
-    # TODO make if that okay !!!!!
-    # transform = transforms.Compose(
-    #     [transforms.ToTensor(),
-    #      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     dataset = MyDataset(dataset_as_array)
     return dataset
 
