@@ -10,7 +10,7 @@ classes = ['car','truck', 'cat']
 # Load the weights of the net
 net = Net()
 # net.load('./model_weights')
-net.load('./EX1')
+net.load('./model_weights')
 
 train_dataset = dataset.get_dataset_as_array('data/dev.pickle')
 
@@ -40,7 +40,7 @@ def total_accuracy():
         100 * correct / total))
 
 
-def accuracy_by_class():
+def accuracy_per_class():
     """
 
     :return:
@@ -74,6 +74,9 @@ def class_imbalance_plot(train_dataset):
     class_size = list()
     for i in range(3):
         class_size.append(labels.count(i))
+# i
+#     for i in range(0, len(train_dataset), 32):
+#         labels = [image_data[1] for image_data in train_dataset[i: i + 32]]
 
     plt.figure(figsize=(9, 3))
     plt.subplot(132)
@@ -83,7 +86,7 @@ def class_imbalance_plot(train_dataset):
     plt.show()
 
 def main():
-    accuracy_by_class()
+    accuracy_per_class()
     total_accuracy()
     class_imbalance_plot(train_dataset)
 
