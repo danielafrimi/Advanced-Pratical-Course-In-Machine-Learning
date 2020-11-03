@@ -4,10 +4,10 @@ import torch.nn as nn
 from torch.utils.data.sampler import WeightedRandomSampler
 
 from dataset import MyDataset, get_dataset_as_array
-from models import Net
+from models import SimpleModel
 
-NUM_EPOCHS = 10
-BATCH_SIZE = 32
+NUM_EPOCHS = 20
+BATCH_SIZE = 16
 
 def get_weighted_random_sampler(train_dataset):
     """
@@ -34,10 +34,10 @@ def get_weighted_random_sampler(train_dataset):
     return sampler
 
 
-model = Net()
+net = SimpleModel()
 
-# Define the Opitmizer and the loss function for the model training
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+# Define the Opitmizer and the loss function for the model
+optimizer = torch.optim.Adam(net.parameters(), lr=0.001, weight_decay=0.001)
 criterion = nn.CrossEntropyLoss()
 
 train_dataset_arr = get_dataset_as_array('data/train.pickle')
@@ -55,14 +55,14 @@ for epoch in range(NUM_EPOCHS):
     running_loss = 0.0
 
     for i, data in enumerate(trainloader, 0):
-        # get the inputs; data is a list of [inputs, labels]
+
         inputs, labels = data
 
         # zero the parameter gradients
         optimizer.zero_grad()
 
         # forward + backward + optimize
-        outputs = model(inputs)
+        outputs = net(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -78,5 +78,5 @@ print('Finished Training')
 
 
 # Save the weights of the trained model
-model.save('./model_weights')
+net.save('./weights')
 
