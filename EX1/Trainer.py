@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import Visualizer
 
 from models import SimpleModel
 
@@ -14,15 +15,17 @@ class Trainer():
         self.lr = lr
 
 
-    def train(self):
+    def train(self, plot_net_error=False):
         """
-
+        Train the model on the data in the data loader and save the weights of the model
         :return:
         """
 
         # Define the Opitmizer and the loss function for the model
         optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr)
         criterion = nn.CrossEntropyLoss()
+
+        net_loss_per_batch = list()
 
         # Train the model
         for epoch in range(self.num_epochs):
@@ -44,11 +47,15 @@ class Trainer():
                 # print statistics
                 running_loss += loss.item()
                 if i % self.batch_size == self.batch_size - 1:  # print every batch
+                    net_loss_per_batch.append(( running_loss / self.batch_size))
                     print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / self.batch_size))
                     running_loss = 0.0
+
+        if plot_net_error:
+            Visualizer.plot_net_error(net_loss_per_batch)
 
         print('Finished Training')
 
         # Save the weights of the trained model
-        self.net.save('./weights.ckpt')
+        self.net.save('./203865837.ckpt')
 
