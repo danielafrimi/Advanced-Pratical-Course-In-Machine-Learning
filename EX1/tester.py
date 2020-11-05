@@ -4,13 +4,13 @@ import torch
 import dataset
 from models import SimpleModel
 
-train_dataset = dataset.get_dataset_as_array('data/dev.pickle')
-
-test_dataset = dataset.get_dataset_as_torch_dataset('data/dev.pickle')
+test_dataset_arr = dataset.get_dataset_as_array('data/dev.pickle')
+dataset.change_cats_label_in_dataset(test_dataset_arr, 'dev')
+test_dataset = dataset.MyDataset(test_dataset_arr)
 
 testloader = torch.utils.data.DataLoader(test_dataset, batch_size=4,
                                           shuffle=True, num_workers=1)
-class Evaluation():
+class Tester():
 
     def __init__(self, model_weights_path='./203865837.ckpt', batch_size=32):
         self.model_weights_path = model_weights_path
@@ -76,8 +76,8 @@ class Evaluation():
 
 
 def main():
-    evaluater = Evaluation('data/pre_trained.ckpt')
-    # evaluater = Evaluation('data/203865837.ckpt')
+    # evaluater = Tester('data/pre_trained.ckpt')
+    evaluater = Tester()
     evaluater.accuracy_per_class()
 
 

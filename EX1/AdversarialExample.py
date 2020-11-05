@@ -28,12 +28,16 @@ def fgsm_attack(image, epsilon, data_grad):
     """
     # Collect the element-wise sign of the data gradient
     sign_data_grad = data_grad.sign()
+
+    noise_image = epsilon * sign_data_grad
+
     # Create the perturbed image by adjusting each pixel of the input image
-    perturbed_image = image + epsilon * sign_data_grad
+    perturbed_image = image + noise_image
+
     # Adding clipping to maintain [0,1] range
     perturbed_image = torch.clamp(perturbed_image, 0, 1)
-    # Return the perturbed image
-    return perturbed_image
+
+    return perturbed_image, noise_image
 
 
 def test_generative_example(epsilon):
@@ -72,7 +76,7 @@ def test_generative_example(epsilon):
         data_grad = data.grad.data
 
         # Call FGSM Attack
-        perturbed_data = fgsm_attack(data, epsilon, data_grad)
+        perturbed_data, noise_signal = fgsm_attack(data, epsilon, data_grad)
 
         # Re-classify the perturbed image
         output = net(perturbed_data)
