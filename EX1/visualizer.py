@@ -7,6 +7,9 @@ from torchvision import transforms
 import numpy as np
 from typing import List
 import os
+from math import sqrt
+from matplotlib.pyplot import imshow
+
 
 def plot_net_error(net_error: List, learning_rate, save_img=False):
     """
@@ -18,7 +21,7 @@ def plot_net_error(net_error: List, learning_rate, save_img=False):
     plt.ylabel('Loss')
     plt.xlabel('Number of Mini-Batches')
     plt.suptitle('Model Running Loss With ' + str(learning_rate) + ' learning rate')
-    plt.ylim(0, 3)
+    plt.ylim(0.9, 1.3)
     if save_img:
         script_dir = os.path.dirname(__file__)
         results_dir = os.path.join(script_dir, 'Results/')
@@ -38,15 +41,28 @@ def matplotlib_imshow(img, one_channel=False):
     :param one_channel:
     :return:
     """
-    if one_channel:
-        img = img.mean(dim=0)
-    img = img / 2 + 0.5 # Unnormalize
-    npimg = img.numpy()
+    npimg = unormalize_img(img, one_channel)
     if one_channel:
         plt.imshow(npimg, cmap="Greys")
     else:
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
+
+def unormalize_img(img, one_channel=False):
+    """
+    Helper function to show an image
+    :param img:
+    :param one_channel:
+    :return:
+    """
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5 # Unnormalize
+    npimg = img.numpy()
+    if one_channel:
+        return npimg
+    return np.transpose(npimg, (1, 2, 0))
+
 
 def plot_class_imbalance(train_dataset, save_img=False):
     """
@@ -80,48 +96,56 @@ def plot_class_imbalance(train_dataset, save_img=False):
     else:
         plt.show()
 
-def visualize_dataset(dataset):
+def vizualize_transform(sample, builtin_transforms=True, transform_list=None):
     """
 
-    :param dataset:
+    :param sample:
+    :param builtin_transforms:
+    :param transform_list:
     :return:
     """
-    # TODO delete
-    size = 10
-    for i in range(int(len(dataset)/(size**2))):
-        curr_figure = plt.figure(figsize=(32, 32))
-        for j in range(1, (size**2) + 1):
-            index = (size**2)*i + (j-1)
-            image, label = dataset[index]
-            img = dataset.un_normalize_image(image)
-            sub_plot = curr_figure.add_subplot(size, size, j)
-            label_name = dataset.label_names()[label]
-            sub_plot.set_title(label_name + ' index: %d' % index)
-            plt.imshow(img)
-            plt.axis('off')
-            print(index)
-        plt.show()
 
-def vizualize_transform(sample):
+    random_affine = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.RandomAffine(degrees=15, fillcolor=0),
+        transforms.ToTensor(),
+    ])
 
-    color_changer = transforms.ColorJitter(saturation=20)
-    random_affine = transforms.RandomAffine(degrees=15)
-    composed = transforms.Compose([transforms.ColorJitter(brightness=30, contrast=50),   ])
+
+    composed_transforms = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.RandomAffine(degrees=15),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+
+    random_horizontal = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.RandomHorizontalFlip(p=1),
+        transforms.ToTensor(),
+    ])
+
+    transform_list = [random_horizontal, random_affine, composed_transforms, ]
+
+    if builtin_transforms:
+        transform_list = transform_list
+
 
     # Apply each of the above transforms on sample.
-    for i, tsfrm in enumerate([color_changer, random_affine]):
-        # TODO Fix it
-        transformed_sample = tsfrm(transforms.ToPILImage()(sample))
-
-        plt.imshow(transformed_sample)
-
-    plt.show()
+    for i, tsfrm in enumerate(transform_list):
+        transformed_sample = tsfrm(dataset.un_normalize_image(sample))
+        imshow(np.asarray(transformed_sample))
+        # matplotlib_imshow(transformed_sample)
 
 
-# train_dataset = dataset.get_dataset_as_torch_dataset('/data/train.pickle')
-# trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=32,
-#                                           shuffle=True, num_workers=2)
-# image, label = train_dataset[5000]
-# img = dataset.un_normalize_image(image)
-# plt.imshow(img)
-# # #
+train_dataset = dataset.get_dataset_as_torch_dataset('./data/train.pickle')
+train_dataset_arr = dataset.get_dataset_as_array('./data/train.pickle')
+trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=32,
+                                          shuffle=True, num_workers=1)
+
+def main():
+    vizualize_transform(train_dataset_arr[4][0])
+
+
+if __name__ == '__main__':
+    main()

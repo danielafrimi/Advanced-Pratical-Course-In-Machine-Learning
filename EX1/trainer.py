@@ -1,42 +1,35 @@
 import torch
 import torch.nn as nn
+
 import visualizer
-import torch.nn.init as init
-import numpy as np
-
 from models import SimpleModel
+import numpy as np
+import torch
+from torch.utils.data.sampler import WeightedRandomSampler
+from torchvision import transforms
+from dataset import MyDataset, get_dataset_as_array, change_cats_label_in_dataset, transform_data
 
-#The weights_init function takes an initialized model as input and reinitializes all convolutional,
-# convolutional-transpose, and batch normalization layers to meet this criteria. This function is
-# applied to the models immediately after initialization
-def weights_init(m): # m is a model
-    classname = m.__class__.__name__
-    if isinstance(m, nn.Linear):
-        init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
-    elif classname.find('Conv') != -1:
-        init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
-    elif classname.find('Linear') != -1:
-        init.xavier_normal_(m.weight, gain=np.sqrt(2.0))
-    elif classname.find('Emb') != -1:
-        init.normal_(m.weight, mean=0, std=0.01)
+
+NUM_EPOCHS = 60
+BATCH_SIZE = 32
+
 
 class Trainer():
 
     def __init__(self, trainloader):
         self.net = SimpleModel()
-        self.net.apply(weights_init)
         self.trainloader = trainloader
 
 
-    def train(self, num_epochs=30, batch_size=32, lr=0.001, plot_net_error=False):
+    def train(self, num_epochs=100, batch_size=32, lr=0.0001, plot_net_error=False):
         """
         Train the model on the data in the data loader and save the weights of the model
-        :return:
+        :return: None
         """
         print("Start Training with lr={}, batch_size= {}".format(lr, batch_size))
 
         # Define the Opitmizer and the loss function for the model
-        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=0.00001)
         criterion = nn.CrossEntropyLoss()
 
         net_loss_per_batch = list()
@@ -76,3 +69,67 @@ class Trainer():
         # Save the weights of the trained model
         self.net.save('./203865837.ckpt')
 
+
+def get_weighted_random_sampler(train_dataset):
+    """
+    Samples elements from ``[0,..,len(weights)-1]`` with given probabilities (weights).
+    :param train_dataset: the train data set
+    :return: WeightedRandomSampler, which sample the data in a custom distribution
+    """
+
+    # Calculate How many samples there are in each class
+    labels = [image_data[1] for image_data in train_dataset]
+    samples_per_class = list()
+    for i in range(3):
+        samples_per_class.append(labels.count(i))
+
+    samples_per_class = np.array(samples_per_class)
+
+    # Calculate the weight if the each class
+    weight = 1. / samples_per_class
+
+    # For each label replace it with the according weight label
+    samples_weight = np.array([weight[label] for label in labels])
+    samples_weight = torch.from_numpy(samples_weight)
+    samples_weight = samples_weight.double()
+
+    # Create a WeightedRandomSampler which load images during the training according to the defined weights
+    sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+    return sampler
+
+
+def main():
+    # Create the trainloader using the train data set
+    train_dataset_arr = get_dataset_as_array('data/train.pickle')
+
+    # Change the wrong labels of 'cat' class
+    change_cats_label_in_dataset(train_dataset_arr)
+
+    augmented_data = transform_data(train_dataset_arr)
+
+    # Create DataSet object with transformation functions
+    train_dataset = MyDataset(augmented_data + train_dataset_arr, transform=transforms.Compose([
+                                                            transforms.ToPILImage(),
+                                                            transforms.RandomHorizontalFlip(p=0.3),
+                                                            transforms.ToTensor(),
+                                                            ]))
+
+    # Create DataSet object without transformation functions
+    train_dataset = MyDataset(augmented_data + train_dataset_arr)
+    # TODO Change
+    train_dataset = MyDataset(train_dataset_arr)
+
+    weighted_random_sampler = get_weighted_random_sampler(train_dataset_arr)
+
+    trainloader = torch.utils.data.DataLoader(dataset=train_dataset,
+                                              batch_size=BATCH_SIZE,
+                                              sampler=weighted_random_sampler,
+                                              num_workers=2)
+
+    # Train the model
+    trainer = Trainer(trainloader)
+    trainer.train(NUM_EPOCHS, BATCH_SIZE, lr=0.001 , plot_net_error=True)
+
+
+if __name__ == '__main__':
+    main()

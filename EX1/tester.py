@@ -1,14 +1,14 @@
-import matplotlib.pyplot as plt
 import torch
 
 import dataset
 from models import SimpleModel
+from trainer import Trainer
 
 test_dataset_arr = dataset.get_dataset_as_array('data/dev.pickle')
-dataset.change_cats_label_in_dataset(test_dataset_arr, 'dev')
+dataset.change_cats_label_in_dataset(test_dataset_arr, False)
 test_dataset = dataset.MyDataset(test_dataset_arr)
 
-testloader = torch.utils.data.DataLoader(test_dataset, batch_size=4,
+testloader = torch.utils.data.DataLoader(test_dataset, batch_size=32,
                                           shuffle=True, num_workers=1)
 class Tester():
 
@@ -21,6 +21,9 @@ class Tester():
 
         # net.load('./model_weights')
         self.net.load(model_weights_path)
+
+        # Set the model in evaluation mode. In this case this is for the Dropout layers
+        self.net.eval()
 
     def total_accuracy(self):
         """
@@ -73,6 +76,19 @@ class Tester():
         for i in range(3):
             print('Accuracy of %5s : %2d %%' % (dataset.label_names().get(i),
                                                 100 * class_correct[i] / class_total[i]))
+
+    def train_net_different_learning_rates(self, lr_arr, trainloader):
+        """
+
+        :param lr_arr:
+        :param trainloader:
+        :return:
+        """
+
+        for i in range(len(lr_arr)):
+            # Train the model
+            trainer = Trainer(trainloader)
+            trainer.train(100, 32, lr_arr[i], plot_net_error=True)
 
 
 def main():
