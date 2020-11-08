@@ -1,14 +1,12 @@
-import torch
-import torch.nn as nn
-
-import visualizer
-from models import SimpleModel
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data.sampler import WeightedRandomSampler
 from torchvision import transforms
-from dataset import MyDataset, get_dataset_as_array, change_cats_label_in_dataset, transform_data
 
+import visualizer
+from dataset import MyDataset, get_dataset_as_array, change_cats_label_in_dataset, transform_data
+from models import SimpleModel
 
 NUM_EPOCHS = 60
 BATCH_SIZE = 32
@@ -29,7 +27,7 @@ class Trainer():
         print("Start Training with lr={}, batch_size= {}".format(lr, batch_size))
 
         # Define the Opitmizer and the loss function for the model
-        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=0.00001)
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=0.001)
         criterion = nn.CrossEntropyLoss()
 
         net_loss_per_batch = list()
@@ -114,9 +112,6 @@ def main():
                                                             transforms.ToTensor(),
                                                             ]))
 
-    # Create DataSet object without transformation functions
-    train_dataset = MyDataset(augmented_data + train_dataset_arr)
-    # TODO Change
     train_dataset = MyDataset(train_dataset_arr)
 
     weighted_random_sampler = get_weighted_random_sampler(train_dataset_arr)
@@ -128,7 +123,7 @@ def main():
 
     # Train the model
     trainer = Trainer(trainloader)
-    trainer.train(NUM_EPOCHS, BATCH_SIZE, lr=0.001 , plot_net_error=True)
+    trainer.train(NUM_EPOCHS, BATCH_SIZE, lr=0.0001 , plot_net_error=True)
 
 
 if __name__ == '__main__':

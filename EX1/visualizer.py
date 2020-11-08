@@ -13,8 +13,8 @@ from matplotlib.pyplot import imshow
 
 def plot_net_error(net_error: List, learning_rate, save_img=False):
     """
-
-    :param net_error:
+    PLot the loss error graph
+    :param net_error: the error of the net along the training
     :return:
     """
     plt.plot(net_error)
@@ -33,36 +33,6 @@ def plot_net_error(net_error: List, learning_rate, save_img=False):
         plt.savefig(results_dir + sample_file_name)
     else:
         plt.show()
-
-def matplotlib_imshow(img, one_channel=False):
-    """
-    Helper function to show an image
-    :param img:
-    :param one_channel:
-    :return:
-    """
-    npimg = unormalize_img(img, one_channel)
-    if one_channel:
-        plt.imshow(npimg, cmap="Greys")
-    else:
-        plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
-
-def unormalize_img(img, one_channel=False):
-    """
-    Helper function to show an image
-    :param img:
-    :param one_channel:
-    :return:
-    """
-    if one_channel:
-        img = img.mean(dim=0)
-    img = img / 2 + 0.5 # Unnormalize
-    npimg = img.numpy()
-    if one_channel:
-        return npimg
-    return np.transpose(npimg, (1, 2, 0))
-
 
 def plot_class_imbalance(train_dataset, save_img=False):
     """
@@ -99,9 +69,9 @@ def plot_class_imbalance(train_dataset, save_img=False):
 def vizualize_transform(sample, builtin_transforms=True, transform_list=None):
     """
 
-    :param sample:
-    :param builtin_transforms:
-    :param transform_list:
+    :param sample: Image as tensor
+    :param builtin_transforms: bool indicator for getting transforms from the user
+    :param transform_list: transforms that we want to operate on the image
     :return:
     """
 
@@ -135,7 +105,7 @@ def vizualize_transform(sample, builtin_transforms=True, transform_list=None):
     for i, tsfrm in enumerate(transform_list):
         transformed_sample = tsfrm(dataset.un_normalize_image(sample))
         imshow(np.asarray(transformed_sample))
-        # matplotlib_imshow(transformed_sample)
+
 
 
 train_dataset = dataset.get_dataset_as_torch_dataset('./data/train.pickle')

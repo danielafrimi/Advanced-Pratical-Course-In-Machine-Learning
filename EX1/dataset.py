@@ -139,7 +139,7 @@ def change_cats_label_in_dataset(dataset, train=True):
 
 def transform_data(dataset, transform_list=None):
     """
-
+    Operaate  transform_list on the data and return the new data
     :param transform_list:
     :return:
     """

@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F
 
 import dataset
-import visualizer
 from models import SimpleModel
 
 test_dataset = dataset.get_dataset_as_torch_dataset('data/dev.pickle')
@@ -21,7 +20,16 @@ net.load('./203865837.ckpt')
 
 net.eval()
 
+# The code was taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
+
 def fgsm_attack(image, epsilon, data_grad):
+    """
+    Fast Gradient Sign Attack code
+    :param image: image that we want to attack
+    :param epsilon: size of the step
+    :param data_grad: the gradient data (gradient according to the image)
+    :return: perturbed image
+    """
     # Collect the element-wise sign of the data gradient
     noise = data_grad.sign()
     # Create the perturbed image by adjusting each pixel of the input image
@@ -32,7 +40,7 @@ def fgsm_attack(image, epsilon, data_grad):
     # Return the perturbed image
     return perturbed_image, dataset.un_normalize_image(noise.squeeze())
 
-def check_test( model, test_loader, epsilon ):
+def fgsm_attack_flow(model, test_loader, epsilon):
 
     # Accuracy counter
     correct = 0
@@ -88,42 +96,50 @@ def check_test( model, test_loader, epsilon ):
     # Return the accuracy and an adversarial example
     return final_acc, adv_examples
 
-accuracies = []
-examples = []
-epsilons = [0, .05, .1, .15, .2, .25, .3]
-# Run test for each epsilon
-for eps in epsilons:
-    acc, distorted_image = check_test(net, testloader, eps)
-    accuracies.append(acc)
-    examples.append(distorted_image)
 
-plt.figure(figsize=(5,5))
-plt.plot(epsilons, accuracies, "*-")
-plt.yticks(np.arange(0, 1.1, step=0.1))
-plt.xticks(np.arange(0, .35, step=0.05))
-plt.title("Accuracy vs Epsilon")
-plt.xlabel("Epsilon")
-plt.ylabel("Accuracy")
-plt.show()
 
-cnt = 0
-plt.figure(figsize=(8,10))
-for i in range(len(epsilons)):
-    for j in range(len(examples[i])):
-        cnt += 1
-        plt.subplot(len(epsilons), 3 ,cnt)
-        plt.xticks([], [])
-        plt.yticks([], [])
-        if j == 0:
-            plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
-        original_label, final_prediction, distorted_image, noise_signal, original_img = examples[i][j]
-        # Get the label's names
-        original_label, final_prediction = dataset.label_names().get(int(original_label)), \
-                                           dataset.label_names().get(int(final_prediction))
-        plt.title("{} -> {}".format(original_label, final_prediction))
-        plt.imsave('noise_signal_{}_epsilon{}.jpg'.format(j, epsilons[i]), noise_signal)
-        plt.imsave('distorted_image_{}_epsilon{}.jpg'.format(j, epsilons[i]), dataset.un_normalize_image(distorted_image))
-        plt.imsave('original_img_{}_epsilon{}.jpg'.format(j, epsilons[i]), dataset.un_normalize_image(original_img))
+def main():
+    accuracies = []
+    examples = []
+    epsilons = [0, .05, .1, .15, .2, .25, .3]
+    # Run test for each epsilon
+    for eps in epsilons:
+        acc, distorted_image = fgsm_attack_flow(net, testloader, eps)
+        accuracies.append(acc)
+        examples.append(distorted_image)
 
-plt.tight_layout()
-plt.show()
+    plt.figure(figsize=(5, 5))
+    plt.plot(epsilons, accuracies, "*-")
+    plt.yticks(np.arange(0, 1.1, step=0.1))
+    plt.xticks(np.arange(0, .35, step=0.05))
+    plt.title("Accuracy vs Epsilon")
+    plt.xlabel("Epsilon")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+    cnt = 0
+    plt.figure(figsize=(8, 10))
+    for i in range(len(epsilons)):
+        for j in range(len(examples[i])):
+            cnt += 1
+            plt.subplot(len(epsilons), 3, cnt)
+            plt.xticks([], [])
+            plt.yticks([], [])
+            if j == 0:
+                plt.ylabel("Eps: {}".format(epsilons[i]), fontsize=14)
+            original_label, final_prediction, distorted_image, noise_signal, original_img = examples[i][j]
+            # Get the label's names
+            original_label, final_prediction = dataset.label_names().get(int(original_label)), \
+                                               dataset.label_names().get(int(final_prediction))
+            plt.title("{} -> {}".format(original_label, final_prediction))
+            plt.imsave('noise_signal_{}_epsilon{}.jpg'.format(j, epsilons[i]), noise_signal)
+            plt.imsave('distorted_image_{}_epsilon{}.jpg'.format(j, epsilons[i]),
+                       dataset.un_normalize_image(distorted_image))
+            plt.imsave('original_img_{}_epsilon{}.jpg'.format(j, epsilons[i]), dataset.un_normalize_image(original_img))
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()
