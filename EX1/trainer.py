@@ -8,10 +8,6 @@ import visualizer
 from dataset import MyDataset, get_dataset_as_array, change_cats_label_in_dataset, transform_data
 from models import SimpleModel
 
-NUM_EPOCHS = 60
-BATCH_SIZE = 32
-
-
 class Trainer():
 
     def __init__(self, trainloader):
@@ -19,7 +15,7 @@ class Trainer():
         self.trainloader = trainloader
 
 
-    def train(self, num_epochs=100, batch_size=32, lr=0.0001, plot_net_error=False):
+    def train(self, num_epochs=50, batch_size=64, lr=0.0001, plot_net_error=False):
         """
         Train the model on the data in the data loader and save the weights of the model
         :return: None
@@ -27,7 +23,7 @@ class Trainer():
         print("Start Training with lr={}, batch_size= {}".format(lr, batch_size))
 
         # Define the Opitmizer and the loss function for the model
-        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=0.001)
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr, weight_decay=0.0001)
         criterion = nn.CrossEntropyLoss()
 
         net_loss_per_batch = list()
@@ -117,13 +113,13 @@ def main():
     weighted_random_sampler = get_weighted_random_sampler(train_dataset_arr)
 
     trainloader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                              batch_size=BATCH_SIZE,
+                                              batch_size=32,
                                               sampler=weighted_random_sampler,
                                               num_workers=2)
 
     # Train the model
     trainer = Trainer(trainloader)
-    trainer.train(NUM_EPOCHS, BATCH_SIZE, lr=0.0001 , plot_net_error=True)
+    trainer.train(lr=0.001 , plot_net_error=True)
 
 
 if __name__ == '__main__':

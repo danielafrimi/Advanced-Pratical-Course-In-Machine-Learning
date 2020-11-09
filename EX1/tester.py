@@ -4,17 +4,13 @@ import dataset
 from models import SimpleModel
 from trainer import Trainer
 
-test_dataset_arr = dataset.get_dataset_as_array('data/dev.pickle')
-dataset.change_cats_label_in_dataset(test_dataset_arr, False)
-test_dataset = dataset.MyDataset(test_dataset_arr)
 
-testloader = torch.utils.data.DataLoader(test_dataset, batch_size=32,
-                                          shuffle=True, num_workers=1)
 class Tester():
 
-    def __init__(self, model_weights_path='./203865837.ckpt', batch_size=32):
+    def __init__(self, testloader, model_weights_path='./203865837.ckpt'):
+
+        self.testloader = testloader
         self.model_weights_path = model_weights_path
-        self.batch_size = batch_size
 
         # Load the weights of the net
         self.net = SimpleModel()
@@ -35,7 +31,7 @@ class Tester():
         correct = 0
         total = 0
         with torch.no_grad():
-            for data in testloader:
+            for data in self.testloader:
                 images, labels = data
 
                 outputs = self.net(images)
@@ -58,7 +54,7 @@ class Tester():
         class_total = list(0. for i in range(3))
 
         with torch.no_grad():
-            for data in testloader:
+            for data in self.testloader:
                 images, labels = data
                 outputs = self.net(images)
                 _, predicted = torch.max(outputs, 1)
@@ -92,8 +88,16 @@ class Tester():
 
 
 def main():
+
+    test_dataset_arr = dataset.get_dataset_as_array('data/dev.pickle')
+    dataset.change_cats_label_in_dataset(test_dataset_arr, False)
+    test_dataset = dataset.MyDataset(test_dataset_arr)
+
+    testloader = torch.utils.data.DataLoader(test_dataset, batch_size=32,
+                                             shuffle=True, num_workers=1)
+
     # evaluater = Tester('data/pre_trained.ckpt')
-    evaluater = Tester()
+    evaluater = Tester(testloader)
     evaluater.accuracy_per_class()
 
 
