@@ -1,12 +1,18 @@
+import os
+import pickle
+from time import time
+
+import matplotlib.pyplot as plt
 import numpy as np
 import numpy.matlib
-import matplotlib.pyplot as plt
-from scipy.stats import multivariate_normal
 from scipy.misc import logsumexp
-import pickle
+from scipy.stats import multivariate_normal
 from skimage.util import view_as_windows as viewW
 
 EPSILON = 0.001
+local_dir_path, f_name = os.path.split(__file__)
+PLOTS_SAVE_DIR = os.path.join(local_dir_path, "plots")
+
 
 def images_example(path='train_images.pickle'):
     """
@@ -139,7 +145,11 @@ def denoise_image(Y, model, denoise_function, noise_std, patch_size=(8, 8)):
 
     # split the image into columns and denoise the columns:
     noisy_patches = im2col(Y, patch_size)
+
+    start = time()
     denoised_patches = denoise_function(noisy_patches, model, noise_std)
+    end = time()
+    print("denoised_patches time is: %s" % (end - start))
 
     # reshape the denoised columns into a picture:
     x_hat = np.reshape(denoised_patches[middle_linear_index, :],
@@ -175,7 +185,6 @@ def normalize_log_likelihoods(X):
     return X - np.matlib.repmat(logsumexp(X, axis=0), h, 1)
 
 
-# TODO i changes the signature
 def _test_denoising(image, model, denoise_function,
                     noise_range=(0.01, 0.05, 0.1, 0.2), patch_size=(8, 8)):
     """
@@ -189,7 +198,7 @@ def _test_denoising(image, model, denoise_function,
     :param patch_size: The size of the patches you've used in your model.
             Default is (8, 8).
     """
-    h, w = np.shape(image)
+    h, w, = np.shape(image)
     noisy_images = np.zeros((h, w, len(noise_range)))
     denoised_images = []
     cropped_original = crop_image(image, patch_size)
@@ -213,12 +222,14 @@ def _test_denoising(image, model, denoise_function,
         print("denoised MSE for noise = " + str(noise_range[i]) + ":")
         print(np.mean((cropped_original - denoised_images[i]) ** 2))
 
-    plt.figure()
+    fig = plt.figure()
     for i in range(len(noise_range)):
         plt.subplot(2, len(noise_range), i + 1)
         plt.imshow(noisy_images[:, :, i], cmap='gray')
         plt.subplot(2, len(noise_range), i + 1 + len(noise_range))
         plt.imshow(denoised_images[i], cmap='gray')
+
+    fig.savefig(PLOTS_SAVE_DIR)
     plt.show()
 
 
@@ -328,9 +339,11 @@ def learn_MVN(X):
     :param X: a DxM data matrix, where D is the dimension, and M is the number of samples.
     :return: A trained MVN_Model object.
     """
-
+    start = time()
     cov = np.cov(X)
     mean = np.mean(X, axis=1)
+    end = time()
+    print("MVN training time is: %s" % (end-start))
     return MVN_Model(mean, cov)
 
 
@@ -345,8 +358,10 @@ def learn_GSM(X, k):
     :param k: The number of components of the GSM model.
     :return: A trained GSM_Model object.
     """
-
+    start = time()
     cov, prob_vector = EM_algorithm_gsm(X, k)
+    end = time()
+    print("GSM training time is: %s" % (end - start))
     return GSM_Model(cov, prob_vector)
 
 
@@ -365,6 +380,16 @@ def learn_ICA(X, k):
 
     # TODO: YOUR CODE HERE
 
+def weiner_formula(Y, cov, mean, noise_std):
+    cov_inv = np.linalg.inv(cov)
+    variance = np.power(noise_std, 2.0)
+    dimension, number_of_noisy_samples = np.shape(cov_inv)
+    I = np.eye(dimension, number_of_noisy_samples)
+
+    first_expression = np.linalg.inv(cov_inv + (1 / variance) * I)
+    second_expression = (cov_inv.dot(mean) + (1 / variance) * Y.T).T
+
+    return first_expression.dot(second_expression)
 
 def MVN_Denoise(Y, mvn_model, noise_std):
     """
@@ -379,8 +404,8 @@ def MVN_Denoise(Y, mvn_model, noise_std):
     :return: a DxM matrix of denoised image patches.
     """
 
-    # TODO: YOUR CODE HERE
-
+    # Weiner formula for denosing the images
+    return weiner_formula(Y, mvn_model.cov, mvn_model.mean, noise_std)
 
 def GSM_Denoise(Y, gsm_model, noise_std):
     """
@@ -396,7 +421,19 @@ def GSM_Denoise(Y, gsm_model, noise_std):
 
     """
 
-    # TODO: YOUR CODE HERE
+    cov = np.copy(gsm_model.cov)
+    k = len(cov)
+    D, M = Y.shape
+
+    # Create K eye matrix for each guassian
+    I = np.full([k, * cov.shape[1:]], fill_value=np.eye(cov.shape[1], cov.shape[2]))
+    noise_mat = noise_std * I
+
+    c = calculte_posterior_probability(Y, gsm_model.mix, cov + noise_mat)
+
+    # Multiply each weiner (that fits to the cov of the i'th guassian) with th coresponded coefficients
+    result = np.array([c[:, i] * weiner_formula(Y=Y, cov=cov[i], mean=np.zeros([D]), noise_std=noise_std) for i in range(k)])
+    return np.sum(result, axis=0)
 
 
 def ICA_Denoise(Y, ica_model, noise_std):
@@ -416,144 +453,102 @@ def ICA_Denoise(Y, ica_model, noise_std):
 
 def calculte_posterior_probability(X, prob_vector_each_guassian, cov_arr):
     """
+    Calcultes the posterior probability
 
-    :param X:
-    :param prob_vector_each_guassian:
-    :param cov_arr:
-    :return:
+    :param X: The patches of the images
+    :param prob_vector_each_guassian: the prob that sample X came from Y_i gaussain
+    :param cov_arr: K Covariance Matrixes (for each guassian)
+    :return: the posterior probability
     """
 
     number_of_gaussians = len(cov_arr)
     number_samples = X.shape[-1]
 
     C = np.array([multivariate_normal.logpdf(X.T, cov=cov_arr[i], allow_singular=True)
-                           for i in range(number_of_gaussians)]).transpose() + np.log(prob_vector_each_guassian)
+                  for i in range(number_of_gaussians)]).T + np.log(prob_vector_each_guassian)
 
+    # Working on log space (taking log and then exp), the shape is (number_samples,number_samples)
     C = np.exp(C - logsumexp(C, axis=1).reshape(number_samples, 1))
     return C
+
+def update_GSM_guassians_scalars(X_Transpose_COV_X, C, dimension):
+    """
+    Updates the scalars for each covariance matrix
+
+    :param X_Transpose_COV_X:
+    :param C: the posterior probability
+    :param dimension: dimension of the samples
+    :return: new scalars for each covariance matrix
+    """
+    r_y_numerator = np.sum(X_Transpose_COV_X.dot(C), axis=0)
+    r_y_denominator = dimension * np.sum(C, axis=0)
+    r_i = r_y_numerator / r_y_denominator
+    return r_i
 
 
 def EM_algorithm_gsm(X, k):
     """
-
-    :param X:
-    :param k:
-    :param MLL_function:
-    :return:
+    Implemention of the  expectation–maximization (EM) algorithm.
+    This algorithm finds (local) maximum likelihood  (iterative)
+    :param X: The patches of the images
+    :param k: Numbers of gussains
+    :return: Optimized params for maximizing the likelihood (for each model we optimize other params)
     """
 
+    # Save the likelihoods in each step of the gsm
+    likelihoods_arr = np.array([])
+
     X = np.array(X)
-    dimension, number_samples = np.ndim(X)
+    if np.ndim(X) == 2:
+        dimension, number_samples = X.shape
+    else:
+        dimension, number_samples = 0, X.shape[0]
 
     # Randomize the scalars for each covariance matrix
-    r_i, prob_scalars = np.random.random(k), np.random.random(k)
+    r_y = np.random.rand(k)
 
     # Probability vector for the mixture of the gaussians
-    prob_vector_each_guassian = prob_scalars / prob_scalars.sum()
+    prob_vector_each_guassian = np.ones([k]) / k
     cov = np.cov(X)
 
     # Create K covraiance matrix with different scalars
-    cov_arr = np.array([r_i[i] * cov for i in range(k)])
+    cov_arr = np.array([r_y[i] * cov for i in range(k)])
 
     # This is a constant, for calculating the new r_i, we need to calculate (X_i.T * COV^-1 * X_i)
     # TODO needs diag?
     X_Transpose_COV_X = np.diag(X.T.dot(np.linalg.pinv(cov)).dot(X)).reshape([1, -1])
 
-    likelihood = np.inf
-    previous_likelihood = -np.inf
+    likelihood = -np.inf
+    previous_likelihood = np.inf
+
 
     # Run until there is converges
-    # TODO check is this is loop is inf
+    # TODO check is this is loop is inf - there is a problem with C
     while (abs(likelihood - previous_likelihood)) > EPSILON:
         previous_likelihood = likelihood
+
         # E Step
         C = calculte_posterior_probability(X, prob_vector_each_guassian, cov_arr)
 
         # M Step
         prob_vector_each_guassian = np.sum(C, axis=0) / number_samples
 
-        r_i_numerator = np.sum(np.dot(C, X_Transpose_COV_X), axis=0)
-        r_i_denominator = dimension * np.sum(C, axis=0)
-        r_i = np.divide(r_i_numerator, r_i_denominator)
+        r_i = update_GSM_guassians_scalars(X_Transpose_COV_X, C, dimension)
         cov_arr = np.array([r_i[i] * cov for i in range(k)])
 
         likelihood = GSM_log_likelihood(X, GSM_Model(cov_arr, prob_vector_each_guassian))
+        likelihoods_arr = np.append(likelihoods_arr, likelihood)
+
+    plot_maximum_ll(likelihoods_arr, "gsm-likelihood_k{}".format(k), k)
 
     return cov_arr, prob_vector_each_guassian
-
-
-
-
-
-def EM_algorithm(prob_vector, mu, cov, X):
-    """
-
-    :param cov:
-    :param mu:
-    :param prob_vector:  initial k-length probability vector for the mixture of the gaussians.
-    :return:
-    """
-    # C_iy is a matrix size (number_of_gaussians X number_of_samples)
-
-    number_of_guassians = len(mu)
-    number_of_samples = len(X[0])
-    c_i_y = np.zeros(number_of_guassians, number_of_samples)
-    old_prob_vector = None
-
-    # While not converge
-    while old_prob_vector is None or prob_vector != old_prob_vector:
-        old_prob_vector = prob_vector
-        # Calculate the C_iy - E step
-
-        # For the C_iy dominator we need to sum all the prob # TODO Check this
-        sum_score_for_y_i_guassian = old_prob_vector * multivariate_normal.pdf(X, mean=mu, cov=cov).sum()
-
-        for y_i in range(number_of_guassians):
-            for sample_j in range(number_of_samples):
-                score_for_y_i_guassian = old_prob_vector[y_i] * multivariate_normal.pdf(X[sample_j], mean=mu[y_i], cov=cov[y_i])
-
-                c_i_y[y_i][sample_j] = np.divide(score_for_y_i_guassian, sum_score_for_y_i_guassian)
-
-        # M Step
-        for y_i in range(number_of_guassians):
-            # For Calculate the prob vector of each guassian
-            numbers_samples_fit_y_i = 0
-            # For Calculate the mu of each guassian
-            # samples_fit_y_i = 0
-
-            for sample_j in range(number_of_samples):
-                # We pass through the samples and check which sample are came from guassian y_i
-                numbers_samples_fit_y_i += c_i_y[y_i][sample_j]
-                # samples_fit_y_i += np.multiply(c_i_y[y_i][sample_j], X[sample_j])
-
-            prob_vector[y_i] = np.divide(numbers_samples_fit_y_i, number_of_samples)
-
-            # TODO for gsm we dont need to learn the mu becuase its always 0
-            # mu[y_i] = np.divide(samples_fit_y_i, numbers_samples_fit_y_i)
-
-        # TODO Calculate the Cov Matrix!!
-
-    return prob_vector, cov
-
-
-def plot_data(data):
-    hx, hy, _ = plt.hist(data, bins=50, normed=1, color="lightblue")
-
-    plt.ylim(0.0, max(hx) + 0.05)
-    plt.title(r'Normal distribution $\mu_0 = 3$ and $\sigma_0 = 0.5$')
-    plt.grid()
-
-    plt.savefig("likelihood_normal_distribution_01.png", bbox_inches='tight')
-    # plt.show()
-    plt.close()
-
 
 def create_GSM_model(patches, k):
     """
 
-    :param patches:
-    :param k: Number of the samples - we need for each sample a Covariance matrix
-    :return:
+    :param patches: the patches of the images
+    :param k: Numbers of gussains
+    :return: GSM Model
     """
     cov_gsm = np.cov(patches)
     cov_scalars = np.random.rand(k)
@@ -568,19 +563,44 @@ def create_GSM_model(patches, k):
 
     return GSM_Model(cov_gsm_extended*cov_scalars, prob_vector)
 
-if __name__ == '__main__':
+def plot_maximum_ll(maximum_ll_arr, title, k):
+    """
+
+    :param maximum_ll_arr:
+    :param title:
+    :param k:
+    :return:
+    """
+    plt.plot(maximum_ll_arr)
+    plt.xlabel('Iteration')
+    plt.ylabel('Likelihood')
+    plt.suptitle('Likelihood Error GSM Model With k{} - EM Algorithm'.format(k))
+
+    if not os.path.isdir(PLOTS_SAVE_DIR):
+        os.makedirs(PLOTS_SAVE_DIR)
+
+    save_path = os.path.join(PLOTS_SAVE_DIR, title)
+    plt.savefig(save_path)
+
+
+def main():
+
+    os.makedirs(PLOTS_SAVE_DIR, exist_ok=True)
     with open('train_images.pickle', 'rb') as f:
         train_pictures = pickle.load(f)
-    num_patches = 70
-    patches = sample_patches(train_pictures, psize=(8, 8), n=num_patches)
 
-    # Run LL for mvn & GSM model
-    ll_mvn = MVN_log_likelihood(patches, MVN_Model(np.mean(patches, axis=1), np.cov(patches)))
-    ll_gsm = GSM_log_likelihood(patches, create_GSM_model(patches, k=num_patches))
+    with open('test_images.pickle', 'rb') as f:
+        test_pictures = pickle.load(f)
+
+    patches = sample_patches(train_pictures, psize=(8, 8))
+    standard_images = grayscale_and_standardize(test_pictures, False)
+
+    # Test for each model how it denoise the image
+    _test_denoising(image=np.random.choice(standard_images), model=learn_GSM(patches, 3), denoise_function=GSM_Denoise)
+    # _test_denoising(image=np.random.choice(standard_images), model=learn_MVN(patches), denoise_function=MVN_Denoise)
 
 
 
-    # initial(patches)
-    # learn_MVN(patches)
+if __name__ == '__main__':
+    main()
 
-    # images_example()
