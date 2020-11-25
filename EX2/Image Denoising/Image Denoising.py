@@ -149,7 +149,6 @@ def denoise_image(Y, model, denoise_function, noise_std, patch_size=(8, 8)):
     start = time()
     denoised_patches = denoise_function(noisy_patches, model, noise_std)
     end = time()
-    print("denoised_patches time is: %s" % (end - start))
 
     # reshape the denoised columns into a picture:
     x_hat = np.reshape(denoised_patches[middle_linear_index, :],
@@ -515,7 +514,6 @@ def EM_algorithm_gsm(X, k):
     cov_arr = np.array([r_y[i] * cov for i in range(k)])
 
     # This is a constant, for calculating the new r_i, we need to calculate (X_i.T * COV^-1 * X_i)
-    # TODO needs diag?
     X_Transpose_COV_X = np.diag(X.T.dot(np.linalg.pinv(cov)).dot(X)).reshape([1, -1])
 
     likelihood = -np.inf
@@ -523,7 +521,6 @@ def EM_algorithm_gsm(X, k):
 
 
     # Run until there is converges
-    # TODO check is this is loop is inf - there is a problem with C
     while (abs(likelihood - previous_likelihood)) > EPSILON:
         previous_likelihood = likelihood
 
@@ -543,7 +540,7 @@ def EM_algorithm_gsm(X, k):
 
     return cov_arr, prob_vector_each_guassian
 
-def create_GSM_model(patches, k):
+def create_GSM_model(patches, k) -> GSM_Model:
     """
 
     :param patches: the patches of the images
@@ -565,11 +562,11 @@ def create_GSM_model(patches, k):
 
 def plot_maximum_ll(maximum_ll_arr, title, k):
     """
-
-    :param maximum_ll_arr:
-    :param title:
-    :param k:
-    :return:
+    Saving the plot of the likelihood
+    :param maximum_ll_arr: the likelihood array (in EM Algorithm)
+    :param title: name of the file
+    :param k: number of gusaains
+    :return: None
     """
     plt.plot(maximum_ll_arr)
     plt.xlabel('Iteration')
@@ -597,7 +594,7 @@ def main():
 
     # Test for each model how it denoise the image
     _test_denoising(image=np.random.choice(standard_images), model=learn_GSM(patches, 3), denoise_function=GSM_Denoise)
-    # _test_denoising(image=np.random.choice(standard_images), model=learn_MVN(patches), denoise_function=MVN_Denoise)
+    _test_denoising(image=np.random.choice(standard_images), model=learn_MVN(patches), denoise_function=MVN_Denoise)
 
 
 
