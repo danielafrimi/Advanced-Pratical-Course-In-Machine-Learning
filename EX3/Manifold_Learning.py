@@ -96,8 +96,7 @@ def plot_with_images(X, images, title, image_num=25):
         x0, y0 = X[img_num, 0] - x_size / 2., X[img_num, 1] - y_size / 2.
         x1, y1 = X[img_num, 0] + x_size / 2., X[img_num, 1] + y_size / 2.
         img = images[img_num, :].reshape(img_size, img_size)
-        ax.imshow(img, aspect='auto', cmap=plt.cm.gray, zorder=100000,
-                  extent=(x0, x1, y0, y1))
+        ax.imshow(img, aspect='auto', cmap=plt.cm.gray, zorder=100000, extent=(x0, x1, y0, y1))
 
     # draw the scatter plot of the embedded data points:
     ax.scatter(X[:, 0], X[:, 1], marker='.', alpha=0.7)
@@ -157,26 +156,9 @@ def create_similarity_kernel(X, sigma):
     """
 
     pairwise_dists = squareform(pdist(X, 'euclidean'))
-    # todo check the sigma if the formula correct
     K = np.exp(-pairwise_dists ** 2 / sigma)
     return K
 
-def get_normalize_kernel(similarity_kernel):
-    # TODO DELETE?
-    """
-
-    :param similarity_kernel:
-    :return:
-    """
-
-    similarity_kernel_length, _ = similarity_kernel.shape
-
-    sums_rows = similarity_kernel.sum(axis=1)
-    D = np.zeros((similarity_kernel_length, similarity_kernel_length), int)
-
-    D = inv(np.fill_diagonal(D, sums_rows))
-
-    return np.dot(D, similarity_kernel)
 
 def DiffusionMap(X, d, sigma, t):
     '''
@@ -192,15 +174,13 @@ def DiffusionMap(X, d, sigma, t):
     '''
     similarity_matrix = create_similarity_kernel(X, sigma)
 
-    # TODO Can normalize in one row with numpy
-    # similarity_matrix = get_normalize_kernel(similarity_matrix) todo
+    # Normalize th rows
     similarity_matrix /= similarity_matrix.sum(axis=1).reshape(-1, 1)
 
     # Diagonalize the similarity matrix.
     eigenvalues, eigenvectors = np.linalg.eigh(similarity_matrix)
 
-    # NumPy returns the eigenvalues and eigenvectors in ascending order of magnitude,
-    # and we want the opposite (eigenvalue in a descending order).
+    # Order the eigenvalues & eigenvectors in descent order
     eigenvalues = eigenvalues[::-1]
     eigenvectors = eigenvectors[:, ::-1]
 
@@ -214,7 +194,7 @@ def DiffusionMap(X, d, sigma, t):
 
 def rotate_in_high_dim_and_inject_noise(low_dim_data, dim=3, noise_std=0.125):
     """
-    # TODO change
+
     This function takes a data in low dimension and project it to high dimension
     while performing a random rotation and adding gaussian noise in the high dimension.
 
@@ -247,7 +227,7 @@ def rotate_in_high_dim_and_inject_noise(low_dim_data, dim=3, noise_std=0.125):
 
     return rotated_data_high_dim, rotation_matrix
 
-# TODO Change
+
 
 def get_gaussians_2d(k=8, n=128, std=0.05):
     """
@@ -262,26 +242,17 @@ def get_gaussians_2d(k=8, n=128, std=0.05):
     :returns: An array of shape (N, 2) where each row contains a 2D point in the dataset.
     """
 
-    # TODO Change # TODO Change
-    # TODO Change # TODO Change
-
-
-    # Generate the angles of each on of the k centers.
     angles = np.linspace(start=0, stop=2 * np.pi, num=k, endpoint=False)
-
-    # Generate the points themselves by taking sin and cos, on the unit ball.
     centers = np.stack([np.cos(angles), np.sin(angles)], axis=1)
 
     # Create an empty array that will contain the generated points.
     points = np.empty(shape=(k * n, 2), dtype=np.float64)
 
-    # For each one of the k centers, generate the points by
-    # sampling from a normal distribution in each axis.
+    # For each one of the k centers, generate the points by sampling from a normal distribution in each axis.
     for i in range(k):
         points[i * n: i * n + n, 0] = np.random.normal(loc=centers[i, 0], scale=std, size=n)
         points[i * n: i * n + n, 1] = np.random.normal(loc=centers[i, 1], scale=std, size=n)
 
-    # Plot the generated points.
     plt.figure()
     plt.scatter(points[:, 0], points[:, 1], s=5)
     plt.show()
@@ -314,51 +285,10 @@ def scree_plot(noise_std_arr=None, high_dim=128):
                          title=f'MDS_distance_matrix_eigenvalues_with_noise_{noise_std:.2f}')
 
 
-def faces_embeddings(path='./faces.pickle'):
-    """
-    Dimension reduction to faces dataset on different algorithms
-    :param path: Path of the faces dataset
-    """
-
-    with open(path, 'rb') as f:
-        faces = pickle.load(f)
-
-    title = 'faces_PCA'
-    faces_pca = PCA(n_components=2).fit_transform(faces)
-    plot_with_images(faces_pca, faces, title)
-    plt.savefig(f'./plots/{title}.png')
-    plt.show()
-
-    title = 'faces_MDS'
-    faces_mds, _ = MDS(distance_matrix(faces, faces), d=2)
-    plot_with_images(faces_mds, faces, title)
-    plt.savefig(f'./plots/{title}.png')
-    plt.show()
-
-    title = 'faces_LLE'
-    faces_mds = LLE(faces, d=2, k=12)
-    plot_with_images(faces_mds, faces, title)
-    plt.savefig(f'./plots/{title}.png')
-    plt.show()
-
-    faces_dm_by_params = dict()
-    for sigma in [1, 2, 3, 4, 5, 6]:
-        for t in [3, 5, 7, 11, 17]:
-            title = f'faces_DiffusionMap_sigma_{sigma}_t_{t}'
-            faces_dm_by_params[(sigma, t)] = DiffusionMap(faces, 2, sigma, t)
-            plot_with_images(faces_dm_by_params[(sigma, t)], faces, title)
-            plt.savefig(f'./plots/{title}.png')
-            plt.show()
-
-    # title = 'faces_tSNE'
-    # faces_tsne = TSNE(n_components=2).fit_transform(faces)
-    # plot_with_images(faces_tsne, faces, title)
-    # plt.savefig(f'./plots/{title}.png')
-    # plt.show()
-
 if __name__ == '__main__':
-    MDS_swiss_roll()
+    # MDS_swiss_roll()
     # LLE_swiss_roll()
     # diffusion_map_swiss_roll()
     # scree_plot()
+    faces_embeddings()
 
