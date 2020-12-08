@@ -1,15 +1,7 @@
-import pickle
-
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.spatial import distance_matrix
-from sklearn import datasets
-from sklearn.manifold import LocallyLinearEmbedding
-from EX3.Manifold_visualizer import *
 from scipy.spatial.distance import pdist, squareform
-from numpy.linalg import inv
-from sklearn.decomposition import PCA
 
+from EX3.Manifold_visualizer import *
+from sklearn.manifold import LocallyLinearEmbedding
 
 def digits_example():
     '''

@@ -1,17 +1,35 @@
 import math
 
-from EX3.Neflix_preprocess import load_files_from_disk, save_created_files
-from sklearn.cluster import SpectralClustering
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 from scipy.spatial import distance_matrix
-# import pydiffmap
+from sklearn.cluster import SpectralClustering
 from sklearn.decomposition import TruncatedSVD
-from EX3.Manifold_Learning import *
 
+from EX3.Manifold_Learning import *
+from EX3.Neflix_preprocess import load_files_from_disk, save_created_files
+
+
+def spectral_clustering(X, title):
+    clustering_netflix = SpectralClustering(
+                        n_clusters=7,
+                        eigen_tol=0.00001,
+                        assign_labels = "discretize",
+                        eigen_solver="arpack",
+                        random_state = 0).fit(X)
+
+    print("Clustering Labels are", clustering_netflix.labels_)
+
+    colors = ['red', 'green', 'blue', 'purple', 'black', 'peru', 'yellow']
+    plt.figure(figsize=(8, 8))
+    plt.scatter(X[:, 0], X[:, 1], c=clustering_netflix.labels_, cmap=matplotlib.colors.ListedColormap(colors))
+    cb = plt.colorbar()
+    loc = np.arange(0, max(clustering_netflix.labels_), max(clustering_netflix.labels_) / float(len(colors)))
+    cb.set_ticks(loc)
+    cb.set_ticklabels(colors)
+    plt.savefig(f'./plots/{title}.png')
 
 def get_means_rating_movies(mat_of_movies_and_users):
     mean_rating_per_movie = np.mean(mat_of_movies_and_users, axis=1)
@@ -50,22 +68,26 @@ def stats_year_realese(df_of_movies_info):
 
 
 
-def dimension_reduction(matrix_movies_and_users):
+def dimension_reduction(matrix_movies_and_users, use_lle=False, plot=True):
 
     svd = TruncatedSVD(n_components=10).fit(matrix_movies_and_users)
     transformed_data = svd.transform(matrix_movies_and_users)
 
+    if use_lle:
+        # LLE
+        for number_neighbors in [5, 10, 15, 16, 20]:
+            embedded_points = LLE(transformed_data, 2, k=number_neighbors)
+
+            if plot:
+                plot_embedded_data(None, embedded_points, "embedded_lle_netflix_neighbors_{}".format(number_neighbors))
+            return embedded_points
+
     # MDS
+    embedded_points, _ = MDS(distance_matrix(transformed_data, transformed_data), d=2)
+    if plot:
+        plot_embedded_data(None, embedded_points, "MDS_netflix")
 
-    # embedded_mds, _ = MDS(distance_matrix(transformed_data, transformed_data), d=2)
-    # plot_embedded_data(None, embedded_mds, "MDS_netflix")
-
-    # LLE
-    for number_neighbors in [5, 10, 15, 16, 20]:
-
-        embedded_lle = LLE(transformed_data, 2, k=number_neighbors)
-        plot_embedded_data(None, embedded_lle, "embedded_lle_netflix_neighbors_{}".format(number_neighbors))
-
+    return embedded_points
 
 
 def scree_plot_data(matrix_movies_and_users):
@@ -92,15 +114,15 @@ def save_partly_movies_user(df_of_movies_info, matrix_movies_and_users):
 def get_top_movies_users(matrix_movies_and_users, df_of_movies_info):
 
     # Takes the movies with the most rating
-    # sum_rating_per_movie = np.sum(matrix_movies_and_users, axis=1)
-    # sort_indices = np.argsort(sum_rating_per_movie, axis=0)[::-1]
-    # sort_indices_sliced = sort_indices[:2000]
-    # sort_indices_sliced = sort_indices_sliced.flatten().tolist()[0]
-    #
-    # reducted_matrix_movies_and_users = matrix_movies_and_users[sort_indices_sliced]
+    sum_rating_per_movie = np.sum(matrix_movies_and_users, axis=1)
+    sort_indices = np.argsort(sum_rating_per_movie, axis=0)[::-1]
+    sort_indices_sliced = sort_indices[:2000]
+    sort_indices_sliced = sort_indices_sliced.flatten().tolist()[0]
+
+    reducted_matrix_movies_and_users = matrix_movies_and_users[sort_indices_sliced]
 
     # Takes the user that rated at most
-    sum_rating_per_user = np.sum(matrix_movies_and_users, axis=0)
+    sum_rating_per_user = np.sum(reducted_matrix_movies_and_users, axis=0)
     sort_indices = np.argsort(sum_rating_per_user, axis=1)[::-1]
     sort_indices_sliced = sort_indices[:3000]
     sort_indices_sliced = sort_indices_sliced.flatten().tolist()[0]
@@ -112,8 +134,8 @@ def get_top_movies_users(matrix_movies_and_users, df_of_movies_info):
 def main():
 
     df_of_movies_info, matrix_movies_and_users = load_files_from_disk()
-    # get_top_movies_users(matrix_movies_and_users, df_of_movies_info)
-    dimension_reduction(matrix_movies_and_users)
+    embedded_data = dimension_reduction(matrix_movies_and_users, use_lle=True, plot=False)
+    spectral_clustering(embedded_data, "LLE Spectral Clustering")
 
 
 

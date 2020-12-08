@@ -105,12 +105,14 @@ def plot_embedded_data(original_points, embdded_points, title):
     cmap = create_random_cmap(6)
     fig = plt.figure()
 
+    subplot= 212 if original_points else 211
+
     if original_points:
         ax = fig.add_subplot(211, projection='3d')
         ax.scatter(original_points[:, 0], original_points[:, 1], original_points[:, 2])
         ax.set_title("Original data")
 
-    ax = fig.add_subplot(212)
+    ax = fig.add_subplot(subplot)
     ax.scatter(embdded_points[:, 0], embdded_points[:, 1], cmap=cmap)
     plt.axis('tight')
     plt.xticks([]), plt.yticks([])
