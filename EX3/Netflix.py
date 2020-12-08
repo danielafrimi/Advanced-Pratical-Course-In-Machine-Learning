@@ -26,7 +26,7 @@ def spectral_clustering(X, title):
     plt.figure(figsize=(8, 8))
     plt.scatter(X[:, 0], X[:, 1], c=clustering_netflix.labels_, cmap=matplotlib.colors.ListedColormap(colors))
     cb = plt.colorbar()
-    loc = np.arange(0, max(clustering_netflix.labels_), max(clustering_netflix.labels_) / float(len(colors)))
+    loc = np.arange(0, max(clustering_netflix.labels_),     max(clustering_netflix.labels_) / float(len(colors)))
     cb.set_ticks(loc)
     cb.set_ticklabels(colors)
     plt.savefig(f'./plots/{title}.png')
