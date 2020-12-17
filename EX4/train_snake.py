@@ -10,14 +10,15 @@ import os
 import sys
 
 from q_policy import QPolicy
+from vanila_reinforce import Vanila
 from snake_wrapper import SnakeWrapper
-from models import SimpleModel
+from EX4.models import SimpleModel
 
 
 def create_model(network_name):
     """
     Kind-of model factory.
-    Edit it to add more models.
+    TODO Edit it to add more models.
     :param network_name: The string input from the terminal
     :return: The model
     """
@@ -42,6 +43,10 @@ def create_policy(policy_name,
     """
     if policy_name == 'dqn':
         return QPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
+
+    elif policy_name == 'vanila':
+        return Vanila(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
+
     else:
         raise Exception('algo {} is not known'.format(policy_name))
 
@@ -60,9 +65,10 @@ def train(steps, buffer_size, opt_every,
     reward_history = []
 
     for step in tqdm(range(steps)):
-
-        # epsilon exponential decay
+        print('step number is now equal to {}'.format(step))
+        # epsilon exponential decay - choosing random action in the future with smaller probailty
         epsilon = max_epsilon * math.exp(-1. * step / (steps / 2))
+        print('epsilon is now equal to {}'.format(epsilon))
         writer.add_scalar('training/epsilon', epsilon, step)
 
         prev_state_tensor = state_tensor
@@ -77,9 +83,12 @@ def train(steps, buffer_size, opt_every,
         policy.record(prev_state_tensor, action_tensor, state_tensor, reward_tensor)
 
         writer.add_scalar('training/reward', reward_history[-1], step)
+        print('reward is now equal to {}'.format(reward))
 
         if step % opt_every == opt_every - 1:
             policy.optimize(batch_size)  # no need for logging, policy logs it's own staff.
+            # TODO save weights?
+            # policy.save()
 
     writer.close()
 
@@ -88,12 +97,12 @@ def parse_args():
     p = argparse.ArgumentParser()
 
     # tensorboard
-    p.add_argument('--name', type=str, required=True, help='the name of this run')
-    p.add_argument('--log_dir', type=str, required=True, help='directory for tensorboard logs (common to many runs)')
+    p.add_argument('--name', type=str, default='afrimi',  help='the name of this run')
+    p.add_argument('--log_dir', type=str, default='logs', help='directory for tensorboard logs (common to many runs)')
 
     # loop
     p.add_argument('--steps', type=int, default=10000, help='steps to train')
-    p.add_argument('--opt_every', type=int, default=100, help='optimize every X steps')
+    p.add_argument('--opt_every', type=int, default=10, help='optimize every X steps')
 
     # opt
     p.add_argument('--buffer_size', type=int, default=800)
@@ -101,8 +110,8 @@ def parse_args():
     p.add_argument('--lr', type=float, default=0.01)
     p.add_argument('-e', '--max_epsilon', type=float, default=0.3, help='for pg, use max_epsilon=0')
     p.add_argument('-g', '--gamma', type=float, default=.3)
-    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c'], required=True)
-    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small'], required=True)
+    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c'], default='dqn')
+    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small'], default='simple')
 
     args = p.parse_args()
     return args
@@ -152,7 +161,6 @@ if __name__ == '__main__':
             exit(0)
 
     del args.__dict__['name']
-    # TODO train_snake.py: error: the following arguments are required: --name, --log_dir, -p/--policy_name, -n/--network_name
     train(**args.__dict__)
 
 

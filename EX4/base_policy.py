@@ -7,7 +7,11 @@ import gym
 class BasePolicy:
     # base class for policy implementation
     def __init__(self, buffer_size, gamma, model, actions_space: gym.Space, summery_writer: SummaryWriter, lr):
+
+        # Discount factor, It’s used to balance immediate and future reward.
+        # It informs the agent of how much it should care about rewards now to rewards in the future - guarantee that the algorithm will converge
         self.gamma = gamma
+
         self.writer = summery_writer   # use this to log your information to tensorboard
         self.model = model
         self.memory = ReplayMemory(capacity=buffer_size)  # example for using this memory - in q_policy.py
