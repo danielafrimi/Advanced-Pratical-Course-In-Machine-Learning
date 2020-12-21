@@ -356,7 +356,6 @@ class Game:
         horzline = '-' * (self.board.shape[1] + 2)
         board = [horzline]
         for timestep in range(self.board.shape[0]):
-            # board.append('|' +''.join(self.render_map[self.board[timestep, c]] for c in range(self.board.shape[1])) + '|')
             board.append('|' +''.join(self.render_map[self.board[timestep, c]] for c in range(self.board.shape[1])) + '|')
         board.append(horzline)
         print('\n'.join(board))

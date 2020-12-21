@@ -13,6 +13,7 @@ The reward is -5 for dieing and a different value for each fruit. In our version
 
 The game was originally created by Daniel Gissin, the previous TA. the game was changed a little this year.
 """
+import os
 
 import gym
 import time

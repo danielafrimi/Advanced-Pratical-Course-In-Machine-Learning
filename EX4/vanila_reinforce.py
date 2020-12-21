@@ -30,7 +30,7 @@ class Vanila(BasePolicy):
         else:
             return self.action_space.sample()  # return action randomly
 
-    def optimize(self, batch_size, global_step=None):
+    def optimize(self, batch_size, gamma, global_step=None):
         # optimize your model
 
         if len(self.memory) < batch_size:

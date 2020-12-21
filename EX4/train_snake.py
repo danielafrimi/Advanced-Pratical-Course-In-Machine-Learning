@@ -1,4 +1,6 @@
 import shutil
+import time
+
 import numpy as np
 import torch
 import random
@@ -51,9 +53,7 @@ def create_policy(policy_name,
         raise Exception('algo {} is not known'.format(policy_name))
 
 
-def train(steps, buffer_size, opt_every,
-          batch_size, lr, max_epsilon, policy_name, gamma, network_name,
-          log_dir):
+def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_name, gamma, network_name, log_dir):
 
     model = create_model(network_name)
     game = SnakeWrapper()
@@ -64,17 +64,18 @@ def train(steps, buffer_size, opt_every,
     state_tensor = torch.FloatTensor(state)
     reward_history = []
 
+
     for step in tqdm(range(steps)):
-        print('step number is now equal to {}'.format(step))
         # epsilon exponential decay - choosing random action in the future with smaller probailty
         epsilon = max_epsilon * math.exp(-1. * step / (steps / 2))
-        print('epsilon is now equal to {}'.format(epsilon))
         writer.add_scalar('training/epsilon', epsilon, step)
 
         prev_state_tensor = state_tensor
         action = policy.select_action(state_tensor, epsilon)
         state, reward = game.step(action)
         reward_history.append(reward)
+
+        writer.add_scalar('training/average_reward', np.mean(reward_history), step)
 
         state_tensor = torch.FloatTensor(state)
         reward_tensor = torch.FloatTensor([reward])
@@ -83,12 +84,17 @@ def train(steps, buffer_size, opt_every,
         policy.record(prev_state_tensor, action_tensor, state_tensor, reward_tensor)
 
         writer.add_scalar('training/reward', reward_history[-1], step)
-        print('reward is now equal to {}'.format(reward))
 
         if step % opt_every == opt_every - 1:
-            policy.optimize(batch_size)  # no need for logging, policy logs it's own staff.
+            policy.optimize(batch_size, gamma, step)  # no need for logging, policy logs it's own staff.
+            gamma = np.power(gamma, step)
             # TODO save weights?
             # policy.save()
+
+        # Render Game
+        if step / steps > 0.6:
+            game.render()
+            time.sleep(0.1)
 
     writer.close()
 
@@ -97,19 +103,19 @@ def parse_args():
     p = argparse.ArgumentParser()
 
     # tensorboard
-    p.add_argument('--name', type=str, default='afrimi',  help='the name of this run')
-    p.add_argument('--log_dir', type=str, default='logs', help='directory for tensorboard logs (common to many runs)')
+    p.add_argument('--name', type=str, default='afrimi_run',  help='the name of this run')
+    p.add_argument('--log_dir', type=str, default='runs', help='directory for tensorboard logs (common to many runs)')
 
     # loop
-    p.add_argument('--steps', type=int, default=10000, help='steps to train')
+    p.add_argument('--steps', type=int, default=5000, help='steps to train')
     p.add_argument('--opt_every', type=int, default=10, help='optimize every X steps')
 
     # opt
     p.add_argument('--buffer_size', type=int, default=800)
     p.add_argument('--batch_size', type=int, default=32)
-    p.add_argument('--lr', type=float, default=0.01)
-    p.add_argument('-e', '--max_epsilon', type=float, default=0.3, help='for pg, use max_epsilon=0')
-    p.add_argument('-g', '--gamma', type=float, default=.3)
+    p.add_argument('--lr', type=float, default=0.0005)
+    p.add_argument('-e', '--max_epsilon', type=float, default=0.5, help='for pg, use max_epsilon=0')
+    p.add_argument('-g', '--gamma', type=float, default=0.96)
     p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c'], default='dqn')
     p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small'], default='simple')
 
@@ -155,10 +161,10 @@ if __name__ == '__main__':
     args.log_dir = os.path.join(args.log_dir, args.name)
 
     if os.path.exists(args.log_dir):
-        if query_yes_no('You already have a run called {}, override?'.format(args.name)):
+    #     if query_yes_no('You already have a run called {}, override?'.format(args.name)):
             shutil.rmtree(args.log_dir)
-        else:
-            exit(0)
+    #     else:
+    #         exit(0)
 
     del args.__dict__['name']
     train(**args.__dict__)
