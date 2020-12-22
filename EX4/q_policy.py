@@ -12,7 +12,6 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 class QPolicy(BasePolicy):
-    # TODO partial code for q-learning
     # you should complete it. You can change it however you want.
     def __init__(self, buffer_size, gamma, model, action_space: gym.Space, summery_writer: SummaryWriter, lr):
         super(QPolicy, self).__init__(buffer_size, gamma, model, action_space, summery_writer, lr)
@@ -21,7 +20,6 @@ class QPolicy(BasePolicy):
         self.lr = lr
         self.optimizer = optim.RMSprop(self.model.parameters())
         self.mse_loss = torch.nn.MSELoss()
-        self.gamma_power = 0
 
 
     def select_action(self, state, epsilon, global_step=None):

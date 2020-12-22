@@ -5,7 +5,7 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 from base_policy import BasePolicy
 import gym
-
+from torch.distributions import Categorical
 
 class Vanila(BasePolicy):
     # partial code for q-learning
@@ -24,9 +24,13 @@ class Vanila(BasePolicy):
 
         random_number = random.random()
         if random_number > epsilon:
-            # here you do the action-selection magic!
-            # TODO YOUR CODE HERE
-            pass
+            # Chooses an action based on our policy probability distribution
+            self.model.eval()
+            with torch.no_grad():
+                prob_actions = self.model(state)
+                categorical_sample = Categorical(prob_actions)
+                action = categorical_sample.sample()
+                return action
         else:
             return self.action_space.sample()  # return action randomly
 

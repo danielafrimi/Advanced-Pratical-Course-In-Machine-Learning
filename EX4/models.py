@@ -13,9 +13,9 @@ class SimpleModel(nn.Module):
 
         self.bn1 = nn.BatchNorm2d(16)
         self.bn2 = nn.BatchNorm2d(32)
-        self.bn3 = nn.BatchNorm2d(32)
 
-        self.lin2 = nn.Linear(32, 3)
+
+        self.fc = nn.Linear(32, 3)
 
     def forward(self, x):
         # nhwc -> nchw
@@ -26,9 +26,9 @@ class SimpleModel(nn.Module):
 
         x = F.relu(self.bn1(self.conv1(center)))
         x = F.relu(self.bn2(self.conv2(x)))
-        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.relu(self.conv3(x))
 
-        x = self.lin2(x.view(-1, 32))
+        x = self.fc(x.view(-1, 32))
         return x
 
     def save(self, path):
@@ -58,7 +58,7 @@ class SmallModel(nn.Module):
         center = F.relu(self.conv1(center))
         center = self.flatten(center)
         center = F.relu(self.fc1(center))
-        center = F.relu(self.fc2(center))
+        center = self.fc2(center)
         return center.squeeze()
 
 
@@ -68,3 +68,73 @@ class SmallModel(nn.Module):
     def load(self, path):
         checkpoint = torch.load(path)
         self.load_state_dict(checkpoint['model_state_dict'])
+
+class VanilaModel(nn.Module):
+
+    def __init__(self):
+        super(VanilaModel, self).__init__()
+        self.conv1 = nn.Conv2d(10, 16, kernel_size=3, padding=2)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=3)
+
+        self.bn1 = nn.BatchNorm2d(16)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.bn3 = nn.BatchNorm2d(32)
+
+        self.fc = nn.Linear(32, 3)
+
+    def forward(self, x):
+        # nhwc -> nchw
+        x = x.permute(0, 3, 1, 2)
+
+        # crop to snake's head in center [3x3]
+        center = x[:, :, 3:6, 3:6]  # The 9 cells around the snakes head (including the head), encoded as one-hot.
+
+        x = F.relu(self.bn1(self.conv1(center)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+
+        x = F.softmax(self.fc(x.view(-1, 32)))
+        return x
+
+class DuelingDQN(nn.Module):
+    def __init__(self):
+        super(DuelingDQN, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(10, 16, kernel_size=3, padding=2),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3),
+            nn.ReLU()
+        )
+
+        self.value_stream = nn.Sequential(
+            nn.Linear(32, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(32, 128),
+            nn.ReLU(),
+            nn.Linear(128, 3)
+        )
+
+    def forward(self, x):
+        # nhwc -> nchw
+        x = x.permute(0, 3, 1, 2)
+
+        # crop to snake's head in center [3x3]
+        center = x[:, :, 3:6, 3:6]  # The 9 cells around the snakes head (including the head), encoded as one-hot.
+
+        features = self.conv(center)
+        features = features.view(features.size(0), -1)
+        values = self.value_stream(features)
+        advantages = torch.squeeze(self.advantage_stream(features))
+        q_vals = values + (advantages - advantages.mean())
+
+        return q_vals

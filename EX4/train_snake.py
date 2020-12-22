@@ -14,18 +14,23 @@ import sys
 from q_policy import QPolicy
 from vanila_reinforce import Vanila
 from snake_wrapper import SnakeWrapper
-from EX4.models import SimpleModel
+from EX4.models import SimpleModel, SmallModel, VanilaModel, DuelingDQN
 
 
 def create_model(network_name):
     """
     Kind-of model factory.
-    TODO Edit it to add more models.
     :param network_name: The string input from the terminal
     :return: The model
     """
     if network_name == 'simple':
         return SimpleModel()
+    elif network_name == 'small':
+        return SmallModel()
+    elif network_name == 'vanilla':
+        return VanilaModel()
+    elif network_name == 'dueling':
+        return DuelingDQN()
     else:
         raise Exception('net {} is not known'.format(network_name))
 
@@ -46,7 +51,7 @@ def create_policy(policy_name,
     if policy_name == 'dqn':
         return QPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
 
-    elif policy_name == 'vanila':
+    elif policy_name == 'vanilla':
         return Vanila(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
 
     else:
@@ -65,10 +70,12 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
     reward_history = []
 
 
+
     for step in tqdm(range(steps)):
         # epsilon exponential decay - choosing random action in the future with smaller probailty
         epsilon = max_epsilon * math.exp(-1. * step / (steps / 2))
         writer.add_scalar('training/epsilon', epsilon, step)
+        writer.add_scalar('training/epsilon', gamma, step)
 
         prev_state_tensor = state_tensor
         action = policy.select_action(state_tensor, epsilon)
@@ -107,17 +114,18 @@ def parse_args():
     p.add_argument('--log_dir', type=str, default='runs', help='directory for tensorboard logs (common to many runs)')
 
     # loop
-    p.add_argument('--steps', type=int, default=5000, help='steps to train')
-    p.add_argument('--opt_every', type=int, default=10, help='optimize every X steps')
+    p.add_argument('--steps', type=int, default=10000, help='steps to train')
+    p.add_argument('--opt_every', type=int, default=5, help='optimize every X steps')
 
     # opt
-    p.add_argument('--buffer_size', type=int, default=800)
+    p.add_argument('--buffer_size', type=int, default=10000)
     p.add_argument('--batch_size', type=int, default=32)
-    p.add_argument('--lr', type=float, default=0.0005)
-    p.add_argument('-e', '--max_epsilon', type=float, default=0.5, help='for pg, use max_epsilon=0')
-    p.add_argument('-g', '--gamma', type=float, default=0.96)
-    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c'], default='dqn')
-    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small'], default='simple')
+    p.add_argument('--lr', type=float, default=0.01)
+    p.add_argument('-e', '--max_epsilon', type=float, default=0.4, help='for pg, use max_epsilon=0')
+    # p.add_argument('-ea', '--epsilon_compare', type=list, default=[0.1, 0.2, 0.4, 0.6, 0.8], help='for pg, use max_epsilon=0')
+    p.add_argument('-g', '--gamma', type=float, default=0.8)
+    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c', 'vanilla'], default='dqn')
+    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small', 'vanilla', 'dueling'], default='dueling')
 
     args = p.parse_args()
     return args
