@@ -18,7 +18,7 @@ class QPolicy(BasePolicy):
 
         # How much you accept the new value vs the old value
         self.lr = lr
-        self.optimizer = optim.RMSprop(self.model.parameters())
+        self.optimizer = optim.RMSprop(self.model.parameters(), lr=lr)
         self.mse_loss = torch.nn.MSELoss()
 
 
@@ -87,9 +87,6 @@ class QPolicy(BasePolicy):
             self.writer.add_scalar('training/loss', loss, global_step)
 
             loss.backward()
-
-            for param in self.model.parameters():
-                param.grad.data.clamp_(-1, 1)
 
             torch.nn.utils.clip_grad_norm(self.model.parameters(), 2)
             self.optimizer.step()

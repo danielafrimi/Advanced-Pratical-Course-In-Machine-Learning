@@ -12,9 +12,9 @@ import os
 import sys
 
 from q_policy import QPolicy
-from vanila_reinforce import Vanila
+from vanila_reinforce import VanillaPolicy
 from snake_wrapper import SnakeWrapper
-from EX4.models import SimpleModel, SmallModel, VanilaModel, DuelingDQN
+from EX4.models import SimpleModel, SmallModel, VanilaModel, DuelingDQN, BiggerModel
 
 
 def create_model(network_name):
@@ -31,6 +31,8 @@ def create_model(network_name):
         return VanilaModel()
     elif network_name == 'dueling':
         return DuelingDQN()
+    elif network_name == 'bigger':
+        return BiggerModel()
     else:
         raise Exception('net {} is not known'.format(network_name))
 
@@ -52,7 +54,7 @@ def create_policy(policy_name,
         return QPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
 
     elif policy_name == 'vanilla':
-        return Vanila(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
+        return VanillaPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
 
     else:
         raise Exception('algo {} is not known'.format(policy_name))
@@ -83,6 +85,7 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
         reward_history.append(reward)
 
         writer.add_scalar('training/average_reward', np.mean(reward_history), step)
+        writer.add_scalar('training/cumulative_reward', np.sum(reward_history), step)
 
         state_tensor = torch.FloatTensor(state)
         reward_tensor = torch.FloatTensor([reward])
@@ -93,39 +96,42 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
         writer.add_scalar('training/reward', reward_history[-1], step)
 
         if step % opt_every == opt_every - 1:
-            policy.optimize(batch_size, gamma, step)  # no need for logging, policy logs it's own staff.
-            gamma = np.power(gamma, step)
-            # TODO save weights?
-            # policy.save()
+            if policy_name == 'vanilla':
+                policy.optimize(T=50, global_step=step)
+            else:
+                policy.optimize(batch_size, gamma, global_step=step)
+                gamma = np.power(gamma, step)
 
-        # Render Game
-        if step / steps > 0.6:
-            game.render()
-            time.sleep(0.1)
+
+        # # Render Game
+        #         # if step / steps > 0.1:
+        #         #     game.render()
+        #         #     time.sleep(0.1)
 
     writer.close()
 
 
 def parse_args():
+    run_name = '{}Model_epsilon{}_lr{}_gamma{}_alpha_{}'
     p = argparse.ArgumentParser()
 
     # tensorboard
-    p.add_argument('--name', type=str, default='afrimi_run',  help='the name of this run')
+    p.add_argument('--name', type=str, default=run_name.format('vanilla', 0.3, 0.005, 0.9, 0.5),  help='the name of this run')
     p.add_argument('--log_dir', type=str, default='runs', help='directory for tensorboard logs (common to many runs)')
 
     # loop
     p.add_argument('--steps', type=int, default=10000, help='steps to train')
-    p.add_argument('--opt_every', type=int, default=5, help='optimize every X steps')
+    p.add_argument('--opt_every', type=int, default=10, help='optimize every X steps')
 
     # opt
-    p.add_argument('--buffer_size', type=int, default=10000)
+    p.add_argument('--buffer_size', type=int, default=1000)
     p.add_argument('--batch_size', type=int, default=32)
-    p.add_argument('--lr', type=float, default=0.01)
-    p.add_argument('-e', '--max_epsilon', type=float, default=0.4, help='for pg, use max_epsilon=0')
-    # p.add_argument('-ea', '--epsilon_compare', type=list, default=[0.1, 0.2, 0.4, 0.6, 0.8], help='for pg, use max_epsilon=0')
-    p.add_argument('-g', '--gamma', type=float, default=0.8)
-    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c', 'vanilla'], default='dqn')
-    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small', 'vanilla', 'dueling'], default='dueling')
+    p.add_argument('--lr', type=float, default=0.005)
+    p.add_argument('-e', '--max_epsilon', type=float, default=0.3, help='for pg, use max_epsilon=0')
+    p.add_argument('-g', '--gamma', type=float, default=0.9)
+    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c', 'vanilla'], default='vanilla')
+    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small', 'vanilla', 'dueling', 'bigger'],
+                   default='vanilla')
 
     args = p.parse_args()
     return args
