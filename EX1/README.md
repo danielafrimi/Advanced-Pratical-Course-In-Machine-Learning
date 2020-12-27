@@ -20,4 +20,4 @@ that mislead the trained model
 
 
 
-
+Read More - [Deep Learning](https://github.com/danielafrimi/Advanced-Pratical-Course-In-Machine-Learning/blob/main/EX1/Answers.pdf)
