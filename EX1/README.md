@@ -1,7 +1,7 @@
 
 Daniel Afrimi 203865837
 EX1 - Advanced Practical Course In Machine Learning
-
+Read More - [Deep Learning](https://github.com/danielafrimi/Advanced-Pratical-Course-In-Machine-Learning/blob/main/EX1/Answers.pdf)
 
 ~~~~~~Files~~~~~~
 
@@ -20,4 +20,4 @@ that mislead the trained model
 
 
 
-Read More - [Deep Learning](https://github.com/danielafrimi/Advanced-Pratical-Course-In-Machine-Learning/blob/main/EX1/Answers.pdf)
+
