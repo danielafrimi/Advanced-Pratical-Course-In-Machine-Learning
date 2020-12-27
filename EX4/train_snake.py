@@ -1,20 +1,19 @@
+import argparse
+import math
+import os
 import shutil
-import time
+import sys
 
 import numpy as np
 import torch
-import random
-from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-import math
-import argparse
-import os
-import sys
+from tqdm import tqdm
 
-from q_policy import QPolicy
-from vanila_reinforce import VanillaPolicy
-from snake_wrapper import SnakeWrapper
 from EX4.models import SimpleModel, SmallModel, VanilaModel, DuelingDQN, BiggerModel
+from double_q_learning_policy import DoublePolicy
+from policy_gradient import PolicyGradient
+from q_policy import QPolicy
+from snake_wrapper import SnakeWrapper
 
 
 def create_model(network_name):
@@ -41,7 +40,6 @@ def create_policy(policy_name,
                   buffer_size, gamma, model: torch.nn.Module, writer: SummaryWriter, lr):
     """
     Kind-of policy factory.
-    Edit it to add more algorithms.
     :param policy_name: The string input from the terminal
     :param buffer_size: size of policy's buffer
     :param gamma: reward decay factor
@@ -50,18 +48,21 @@ def create_policy(policy_name,
     :param lr: initial learning rate
     :return: A policy object
     """
+
     if policy_name == 'dqn':
         return QPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
 
-    elif policy_name == 'vanilla':
-        return VanillaPolicy(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
+    elif policy_name == 'pg':
+        return PolicyGradient(buffer_size, gamma, model, SnakeWrapper.action_space, writer, lr=lr)
+
+    elif policy_name == 'double_q_learning':
+        return DoublePolicy(buffer_size, gamma, model, model, SnakeWrapper.action_space, writer, lr=lr)
 
     else:
         raise Exception('algo {} is not known'.format(policy_name))
 
 
-def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_name, gamma, network_name, log_dir):
-
+def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_name, gamma, network_name, log_dir, alpha):
     model = create_model(network_name)
     game = SnakeWrapper()
     writer = SummaryWriter(log_dir=log_dir)
@@ -70,14 +71,12 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
     state = game.reset()
     state_tensor = torch.FloatTensor(state)
     reward_history = []
-
-
-
+    optimization_counter = 0
     for step in tqdm(range(steps)):
-        # epsilon exponential decay - choosing random action in the future with smaller probailty
+
+        # epsilon exponential decay - choosing random action in the future with smaller probability
         epsilon = max_epsilon * math.exp(-1. * step / (steps / 2))
         writer.add_scalar('training/epsilon', epsilon, step)
-        writer.add_scalar('training/epsilon', gamma, step)
 
         prev_state_tensor = state_tensor
         action = policy.select_action(state_tensor, epsilon)
@@ -85,7 +84,8 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
         reward_history.append(reward)
 
         writer.add_scalar('training/average_reward', np.mean(reward_history), step)
-        writer.add_scalar('training/cumulative_reward', np.sum(reward_history), step)
+        writer.add_scalar('training/last_50_steps_reward', np.mean(reward_history[-50:]), step)
+
 
         state_tensor = torch.FloatTensor(state)
         reward_tensor = torch.FloatTensor([reward])
@@ -95,43 +95,43 @@ def train(steps, buffer_size, opt_every, batch_size, lr, max_epsilon, policy_nam
 
         writer.add_scalar('training/reward', reward_history[-1], step)
 
+
         if step % opt_every == opt_every - 1:
-            if policy_name == 'vanilla':
-                policy.optimize(T=50, global_step=step)
-            else:
-                policy.optimize(batch_size, gamma, global_step=step)
-                gamma = np.power(gamma, step)
+            optimization_counter += 1
+            policy.optimize(batch_size=batch_size,
+                            global_step=step,
+                            alpha=alpha,
+                            update_target=optimization_counter % 50 == 0)
 
 
-        # # Render Game
-        #         # if step / steps > 0.1:
-        #         #     game.render()
-        #         #     time.sleep(0.1)
+        # Render Game
+                # if step / steps > 0.1:
+                #     game.render()
+                #     time.sleep(0.1)
 
     writer.close()
 
 
 def parse_args():
-    run_name = '{}Model_epsilon{}_lr{}_gamma{}_alpha_{}'
     p = argparse.ArgumentParser()
 
     # tensorboard
-    p.add_argument('--name', type=str, default=run_name.format('vanilla', 0.3, 0.005, 0.9, 0.5),  help='the name of this run')
+    p.add_argument('--name', type=str, default='debug',  help='the name of this run')
     p.add_argument('--log_dir', type=str, default='runs', help='directory for tensorboard logs (common to many runs)')
 
     # loop
-    p.add_argument('--steps', type=int, default=10000, help='steps to train')
-    p.add_argument('--opt_every', type=int, default=10, help='optimize every X steps')
+    p.add_argument('--steps', type=int, default=15000, help='steps to train')
+    p.add_argument('--opt_every', type=int, default=128, help='optimize every X steps')
 
     # opt
-    p.add_argument('--buffer_size', type=int, default=1000)
+    p.add_argument('--buffer_size', type=int, default=1024)
     p.add_argument('--batch_size', type=int, default=32)
-    p.add_argument('--lr', type=float, default=0.005)
-    p.add_argument('-e', '--max_epsilon', type=float, default=0.3, help='for pg, use max_epsilon=0')
-    p.add_argument('-g', '--gamma', type=float, default=0.9)
-    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c', 'vanilla'], default='vanilla')
-    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small', 'vanilla', 'dueling', 'bigger'],
-                   default='vanilla')
+    p.add_argument('--lr', type=float, default=0.0001)
+    p.add_argument('-e', '--max_epsilon', type=float, default=0.5, help='for pg, use max_epsilon=0')
+    p.add_argument('-g', '--gamma', type=float, default=0.3)
+    p.add_argument('-p', '--policy_name', type=str, choices=['dqn', 'pg', 'a2c', 'vanilla', 'double_q_learning'], default='dqn')
+    p.add_argument('-n', '--network_name', type=str, choices=['simple', 'small', 'vanilla', 'dueling', 'bigger'], default='dueling')
+    p.add_argument('-a', '--alpha', type=float, default=0.4)
 
     args = p.parse_args()
     return args
@@ -172,13 +172,15 @@ def query_yes_no(question, default="yes"):
 
 if __name__ == '__main__':
     args = parse_args()
-    args.log_dir = os.path.join(args.log_dir, args.name)
+    run_name = '{}PolicyName_{}_ModelName_{}Gamma_{}Epsilon_{}Alpha_{}lr_{}T'\
+        .format(args.policy_name, args.network_name, args.gamma, args.max_epsilon, args.alpha, args.lr, args.batch_size)
+    args.log_dir = os.path.join(args.log_dir, run_name)
 
     if os.path.exists(args.log_dir):
-    #     if query_yes_no('You already have a run called {}, override?'.format(args.name)):
+        if query_yes_no('You already have a run called {}, override?'.format(args.name)):
             shutil.rmtree(args.log_dir)
-    #     else:
-    #         exit(0)
+        else:
+            exit(0)
 
     del args.__dict__['name']
     train(**args.__dict__)

@@ -36,7 +36,6 @@ class QPolicy(BasePolicy):
         random_number = random.random()
         if random_number > epsilon:
             # Exploit: select the action with max value (future reward)
-            self.model.eval()
             with torch.no_grad():
                 expected_reward_per_action = self.model(state)
 
@@ -46,7 +45,7 @@ class QPolicy(BasePolicy):
             # Explore: select a random action
             return self.action_space.sample()
 
-    def optimize(self, batch_size, gamma, global_step=None):
+    def optimize(self, batch_size, global_step=None, update_target=None, alpha=None):
         """
         Optimize the model
         :param batch_size:
@@ -80,7 +79,7 @@ class QPolicy(BasePolicy):
             with torch.no_grad():
                 next_state_values = self.model(next_state_batch).max(1)[0].detach()
                 # Compute the expected Q values
-                expected_state_action_values = (next_state_values * gamma) + reward_batch
+                expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
             # Compute Huber loss
             loss = self.mse_loss(state_action_values, expected_state_action_values)

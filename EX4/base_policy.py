@@ -21,7 +21,7 @@ class BasePolicy:
         # 'global_step' might be used as time-index for tensorboard recordings.
         raise NotImplementedError()
 
-    def optimize(self, batch_size, gamma, global_step=None):
+    def optimize(self, batch_size, global_step=None, update_target=None, alpha=None):
         raise NotImplementedError()
 
     def record(self, state, action, next_state, reward):
