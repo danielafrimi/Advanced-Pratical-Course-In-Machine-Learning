@@ -13,10 +13,12 @@ from EX5.datasets import MNIST
 from EX5.models import GeneratorForMnistGLO
 
 NUM_CLASSES = 10
+REG_FACTOR = 0.003
 
 
 class Trainer:
     def __init__(self, train_dataset, lr_glo, lr_content, lr_class, noise_std, batch_size, loss_fraction=0.5, log_dir='runs'):
+
         self.glo: nn.Module = GeneratorForMnistGLO(code_dim=100)
 
         self.train_loader =  torch.utils.data.DataLoader(dataset=train_dataset,
@@ -30,19 +32,10 @@ class Trainer:
         self.l2_loss = nn.MSELoss()
 
         # Class Embedding (for each class there is one embedding vector)
-        self.class_embedding1 = torch.rand(NUM_CLASSES, 50).requires_grad_()
+        self.class_embedding = torch.rand(NUM_CLASSES, 50).requires_grad_()
 
         # For each image we learn the content embedding
-        self.content_embedding1 = torch.rand(len(train_dataset), 50).requires_grad_()
-
-        # TODO delete?
-
-        # Class Embedding (for each class there is one embedding vector)
-        # requires_grad for optimize the latent vector for the class label and the images content
-        self.class_embedding = nn.Embedding(NUM_CLASSES, 50).requires_grad_(requires_grad=True)
-
-        # For each image we learn the content embedding
-        self.content_embedding = nn.Embedding(len(train_dataset), 50).requires_grad_(requires_grad=True)
+        self.content_embedding = torch.rand(len(train_dataset), 50).requires_grad_()
 
         # Hyper-Parameters
         self.lr_glo = lr_glo
@@ -56,8 +49,8 @@ class Trainer:
 
         optimizer = Adam([
             {'params': self.glo.parameters(), 'lr': self.lr_glo},
-            {'params': self.class_embedding.parameters(), 'lr': self.lr_class},
-            {'params': self.content_embedding.parameters(), 'lr': self.lr_content},
+            {'params': self.class_embedding, 'lr': self.lr_class},
+            {'params': self.content_embedding, 'lr': self.lr_content},
         ])
 
         for epoch in range(num_epochs):
@@ -65,10 +58,10 @@ class Trainer:
 
             for i, (images, class_label, idx) in enumerate(self.train_loader):
                 # Take the according embedding vectors of the classes and make it a tensor todo float tensor or what?
-                class_embedding = self.class_embedding1[class_label]
+                class_embedding = self.class_embedding[class_label]
 
                 # Take the according embedding vector of the images (per batch) and make it a tensor
-                content_embedding_batch = self.content_embedding1[idx]
+                content_embedding_batch = self.content_embedding[idx]
 
                 if self.noise_std > 0:
                     noise = torch.normal(0, self.noise_std, size=content_embedding_batch.shape)
@@ -81,28 +74,14 @@ class Trainer:
                 # Concatenate class labels + content vectors
                 code = torch.cat((class_embedding, content_embedding_noise), dim=1)
 
-                # TODO Using Embedding Layers
-
-                # # Take the according embedding vectors of the classes and make it a tensor
-                # class_batch = self.class_embedding(torch.LongTensor(class_label))
-                #
-                # # Take the according embedding vector of the images (per batch) and make it a tensor
-                # content_embedding_batch = self.content_embedding(torch.LongTensor(idx))
-                #
-                # noise = torch.normal(mean=0, std=self.noise_std,
-                #                      size=content_embedding_batch.shape) if self.noise_std > 0 \
-                #     else torch.zeros(content_embedding_batch.shape)
-                #
-                #
-                # # Concatenate class labels + content vectors
-                # code = torch.cat((class_batch, content_embedding_batch + noise), dim=1)
-
                 # Start Optimizing
                 optimizer.zero_grad()
 
                 generated_images = self.glo(code)
 
-                loss = self.l1_loss(images, generated_images) +  self.l2_loss(images, generated_images)
+                # Use L1 and L2 to get better result, also added regularization factor to the content weights.
+                loss = self.l1_loss(images, generated_images) +  self.l2_loss(images, generated_images) + \
+                       REG_FACTOR * torch.pow(torch.norm(content_embedding_noise, p=1), 2)
 
                 loss.backward()
                 optimizer.step()
@@ -117,8 +96,6 @@ class Trainer:
             self.writer.add_scalar('training/loss', running_loss, epoch)
 
         self.glo.save('weights.ckpt')
-        self.glo.generate_digit(digit_embedding=self.class_embedding[7])
-
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -129,8 +106,8 @@ def parse_args():
     # opt
     p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--lr_glo', type=float, default=0.001)
-    p.add_argument('--lr_content', type=float, default=0.01)
-    p.add_argument('--lr_class', type=float, default=0.01)
+    p.add_argument('--lr_content', type=float, default=0.001)
+    p.add_argument('--lr_class', type=float, default=0.001)
     p.add_argument('--noise_std', type=float, default=0.3)
     p.add_argument('--loss', type=str, default='combined')
 
@@ -139,13 +116,6 @@ def parse_args():
 
 
 def distance_metric(sz, force_l2=False):
-    """
-
-    :param sz:
-    :param force_l2:
-    :return:
-    """
-
     if force_l2:
         return nn.L1Loss().cuda()
     if sz == 16:
@@ -175,5 +145,5 @@ if __name__ == '__main__':
     train_dataset = MNIST(num_samples=256)
 
     glo_trainer = Trainer(train_dataset, **args.__dict__)
-    glo_trainer.train()
+    glo_trainer.train(num_epochs=1)
 

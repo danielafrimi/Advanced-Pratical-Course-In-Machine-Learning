@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-
+import matplotlib.pyplot as plt
+import numpy as np
+from torchvision.utils import make_grid
 
 class View(nn.Module):
     def __init__(self, shape):
@@ -9,6 +11,10 @@ class View(nn.Module):
 
     def forward(self, x):
         return x.view(*self.shape)
+
+def save_img(img):
+    npimg = img.detach().numpy()
+    plt.imsave('random_content.png', np.transpose(npimg, (1,2,0)))
 
 
 class GeneratorForMnistGLO(nn.Module):
@@ -37,10 +43,26 @@ class GeneratorForMnistGLO(nn.Module):
         return self.net(code)
 
     def test(self):
-        code_dim = 50
+        code_dim = 100
         batch_size = 32
         random_tensor = torch.rand(batch_size, code_dim)
         print(f'the shape of the code is {random_tensor.shape}')
         result = self.forward(random_tensor)
         print(f'the shape of the result is {result.shape}')
+        grid = make_grid(result, nrow=10, padding=10)
+        save_img(grid)
+
+    def generate_digit(self, digit_embedding):
+        noise_vector = torch.rand(1, 50).squeeze()
+        code = torch.cat((digit_embedding, noise_vector), dim=0)
+        result = self.forward(code).squeeze()
+        print(f'the shape of the result is {result.shape}')
+        plt.imshow(result.detach().numpy())
+
+    def save(self, path):
+        torch.save({'model_state_dict': self.state_dict()}, path)
+
+    def load(self, path):
+        checkpoint = torch.load(path)
+        self.load_state_dict(checkpoint['model_state_dict'])
 
